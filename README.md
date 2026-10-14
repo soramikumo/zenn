@@ -21,3 +21,19 @@ npx zenn preview          # http://localhost:8000 でプレビュー
 - slug は 12〜50 字の半角英小文字・数字・ハイフン・アンダースコア。
 - `published: false` のまま push すると下書き、`true` にして push すると公開。
 - 公開済みの記事は Zenn のエディタではなく、このリポジトリで直す。
+
+## 記事一覧
+
+| ファイル | タイトル |
+|---|---|
+| [54636fbe69ee1a](articles/54636fbe69ee1a.md) | Loop Engineeringへ入門 デスクトップを常時起動の実行土台を作った |
+| [7ed324ea68dc1c](articles/7ed324ea68dc1c.md) | 2026年に実務1年目で転職活動してわかったこと |
+| [1c3eaa134df25c](articles/1c3eaa134df25c.md) | 新人がSVN→Git 移行と CI/CD 構築した半年間の話 |
+| [8675c315dd5175](articles/8675c315dd5175.md) | 「何がしたいの？」に答えられなかったので、キャリアの軸を決めた |
+| [dd3b3491634389](articles/dd3b3491634389.md) | IaaSが落ちた深夜-クエリを書かずに調査する ― Observability Agent |
+| [21c2511bb9516b](articles/21c2511bb9516b.md) | SAAに合格したけど全然身になってなかった話 |
+| [9b6f00aad4d0ec](articles/9b6f00aad4d0ec.md) | 【リアーキテクチャ】Azure VMからVMSSに移行した話 |
+| [email-codex-guide](articles/email-codex-guide.md) | （下書き）メールはどう届く？送信ボタンから受信トレイに現れるまで |
+| [how-email-reaches-inbox](articles/how-email-reaches-inbox.md) | （下書き）メールを送信してから相手の受信トレイに届くまで |
+
+公開済みの記事はファイル名が URL の slug なので変えない（変えると別の記事になる）。新しい記事は題名に沿った slug で作る。
