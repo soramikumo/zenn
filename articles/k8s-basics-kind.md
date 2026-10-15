@@ -96,7 +96,7 @@ Kubernetes が動かすのはコンテナです。コンテナはアプリと、
 | コンテナランタイム | コンテナを起動・停止するソフト | containerd |
 
 :::details Docker との関係
-Docker はコンテナを作って動かすための道具一式です。Kubernetes はコンテナランタイムとして containerd などを使い、Docker 本体は必要ないのです。（v1.24 で dockershim が外れました）。Docker で作ったイメージはそのまま動かすことができます。
+Docker はコンテナを作って動かすための道具一式です。Kubernetes はコンテナランタイムとして containerd などを使い、Docker 本体は必要ありません（v1.24 で dockershim が外れました）。Docker で作ったイメージはそのまま動かすことができます。
 :::
 
 @[card](https://kubernetes.io/ja/docs/concepts/containers/)
@@ -130,7 +130,7 @@ Docker はコンテナを作って動かすための道具一式です。Kuberne
 ノードの上で、コンテナはそのまま動くわけではありません。**Pod** という箱に入れて動かします。Kubernetes が置き場所を決めたり作り直したりする単位も、コンテナではなく Pod です。
 
 たいていは1つの Pod に1つのコンテナです。いつも一緒に動くべきもの同士（アプリ本体とログを送る係など）は、同じ Pod に入れることもあります。(計装など)
-**同じ Pod のコンテナは IP と保存領域を共有し、必ず同じノードで動きます。**
+**同じ Pod のコンテナは IP を共有し、保存領域（Volume）も共有でき、必ず同じノードで動きます。**
 
 Pod は使い捨てです。消えると IP も一緒に消え、作り直された Pod は別の IP になります。
 > この性質は、後で出てくる Service につながります。
@@ -486,7 +486,7 @@ svc IP: 10.96.102.183
 kubectl set image deploy/web nginx=nginx:9.99-doesnotexist
 ```
 
-`rollout status` は60秒で `error: timed out waiting for the condition` になりました。そのときの様子です（実ログ）。
+`rollout status --timeout=60s` は `error: timed out waiting for the condition` になりました。そのときの様子です（実ログ）。
 
 ```
 $ kubectl get pods -l app=web
@@ -509,14 +509,6 @@ deployment.apps/web rolled back
 image: nginx:1.27-alpine
 ```
 
-:::message
-`kubectl apply` で作ったものを `rollout undo` すると、次の Warning が出ます。
-
-`Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation`
-
-YAML は古いタグのまま残るので、次に apply すると食い違います。本番では YAML を直して apply し直すほうが安全です。
-:::
-
 ### ⑦ ノードが落ちるとどうなる
 
 Pod が2つ載っている worker2 を、`docker stop` で丸ごと止めました。5秒おきに様子を見ています（実ログ・抜粋）。
@@ -535,7 +527,7 @@ Normal  SuccessfulCreate      replicaset/web-67bd6dbcb4 Created pod: web-67bd6db
 時間の内訳は次のとおりです。
 
 1. ノードから返事がなくなり、NotReady と判定されるまで **54秒**
-2. Pod に付いている toleration「NotReady でも **300秒** は待つ」が切れるまで待つ
+2. Pod に付いている toleration「ノードと連絡が取れなくても **300秒** は待つ」が切れるまで待つ
 3. 切れたら Pod を退避させ、ReplicaSet が別のノードに作り直す
 
 300秒はノードの一時的な瞬断で Pod を動かさないための既定値です。短くしたいときは Pod の `tolerationSeconds` で変更できます。
@@ -578,10 +570,10 @@ Pod 単体の故障なら一瞬で戻ります。ノードごと落ちたとき�
 k8sの基礎から実際に壊してどう動くかまでをまとめてみました。
 k8sは固有の概念が多いように見えますが、その概念は他の技術でも使うことが多いです。
 
-自己修復性はリコンサイルとも言われ、Reactのレンダリング技術でも出てきたり、serviceの振り分けはLBのようなものだとイメージした方もいるのではないでしょうか。
+自己修復を支える仕組みはリコンサイル（reconcile）と呼ばれ、Reactのレンダリング技術でも出てきたり、serviceの振り分けはLB(L4の)のようなものだとイメージした方もいるのではないでしょうか。
 
 k8sを学ぶことで、インフラ領域における堅牢性の高いシステムの実践的な動作を知ることができると思います。
-k8sは利用者が多く、ossで提供されているため、多くのサードパーティツールがあります。
+k8sは利用者が多く、OSSで提供されているため、多くのサードパーティツールがあります。
 いつか別の記事でそういったツールをまとめたいと思います。
 
 
