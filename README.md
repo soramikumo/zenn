@@ -33,6 +33,7 @@ npx zenn preview          # http://localhost:8000 でプレビュー
 | [dd3b3491634389](articles/dd3b3491634389.md) | IaaSが落ちた深夜-クエリを書かずに調査する ― Observability Agent |
 | [21c2511bb9516b](articles/21c2511bb9516b.md) | SAAに合格したけど全然身になってなかった話 |
 | [9b6f00aad4d0ec](articles/9b6f00aad4d0ec.md) | 【リアーキテクチャ】Azure VMからVMSSに移行した話 |
+| [k8s-basics-kind](articles/k8s-basics-kind.md) | 今更Kubernetesへ入門する アーキテクチャと自己修復 |
 | [email-codex-guide](articles/email-codex-guide.md) | （下書き）メールはどう届く？送信ボタンから受信トレイに現れるまで |
 | [how-email-reaches-inbox](articles/how-email-reaches-inbox.md) | （下書き）メールを送信してから相手の受信トレイに届くまで |
 
