@@ -49,22 +49,13 @@ Terraformの登場人物を整理し、init・plan・applyで何が起きるか�
 
 Terraformが見ているのは、コード・state・実リソースの3つだけです。providerはその間に立つ通訳です。
 
-```
-コード(.tf)  ←比較→  state  ←比較→  実リソース
-「こうあってほしい」  「前回作ったもの」   「今あるもの」
-                                         ↑
-                                provider が API で読み書きする
-```
+![Terraformは3つを見比べる](/images/terraform-state-basics/01-cast.png)
 
 「Terraformは3つを見比べて、差分だけを実行するツール」です。
 
 ## init・plan・applyで何が起きるか
 
-| コマンド | 読むもの | 書くもの |
-|---|---|---|
-| init | コード（providerとbackendの指定） | `.terraform/`（provider本体）と`.terraform.lock.hcl` |
-| plan | コード・state・実リソース | 何も書かない |
-| apply | コード・state・実リソース | 実リソースとstate |
+![init・plan・applyが読むもの・書くもの](/images/terraform-state-basics/02-commands.png)
 
 使ったコードはこれだけです。
 
@@ -202,6 +193,8 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 `Refreshing state...`で実リソースを読み、消えていることに気づいて作り直そうとしています。この状態をドリフトと呼びます。
 
+![stateと実物がずれたときのplan](/images/terraform-state-basics/03-drift.png)
+
 :::message
 ずれの出方はproviderによって違います。`local_file`は中身を手で書き換えても「消えた」とみなし、作り直しを提案しました。クラウドのリソースは設定を変えられても、多くは`~ update in-place`で元に戻そうとします。
 :::
@@ -283,14 +276,7 @@ planの表示では隠れていますが、stateにはそのまま入ります�
 
 Terraformはディレクトリごとにstateを1つ持ちます。ディレクトリをどう切るかで、stateの分け方が決まります。
 
-```
-terraform/
-├── bootstrap/      # stateを置くバケットを作る
-├── env/
-│   ├── dev/        # devのstate
-│   └── prod/       # prodのstate
-└── modules/        # stateを持たない部品
-```
+![ディレクトリ1つにstateが1つ](/images/terraform-state-basics/04-directory.png)
 
 ### env：環境ごとにstateを分けて、壊れる範囲を限る
 
@@ -305,6 +291,8 @@ moduleは呼び出した側（env/devなど）のstateに入ります。module�
 env/devのbackendでGCSを指定するには、先にバケットが要ります。そのバケットを作るのがbootstrapです。
 
 問題はbootstrap自身のstateをどこに置くかです。選択肢は2つあります。
+
+![bootstrapのstateの置き場所は2案](/images/terraform-state-basics/05-bootstrap.png)
 
 **作ったバケットに移す**
 
