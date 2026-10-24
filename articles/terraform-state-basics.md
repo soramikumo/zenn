@@ -10,7 +10,10 @@ published: false
 
 昨今はAIエージェントのおかげで、リプレースがしやすくなりました。それでも3割くらいはIaCできない現場があると私は思っています（大偏見）。
 
-AIに`.tf`を書かせることはできます。ただ、applyして何が消えるかを判断するのは人間です。その判断に要るのがstateの理解です。改めてTerraformを理解しましょう。
+`terraform`は書くこと自体は簡単です。hclという言語でyamlと同じように人間が見やすい構造言語になっています。
+
+なのでAIに`terraform`を書かせることは簡単です。レビューも簡単です。
+ただ、applyして何が消えるかを判断するのは人間です。その判断に要るのがstateの理解です。改めてTerraformを理解しましょう。
 
 module周りの書き方（変数の受け渡しなど）は扱いません。絞るのは2つ。Terraformが裏でしていることと、stateの扱い方です。
 
@@ -24,42 +27,62 @@ module周りの書き方（変数の受け渡しなど）は扱いません。�
 
 Terraformの登場人物を整理し、init・plan・applyで何が起きるか実際に動かして確かめます。そのうえでstateの置き場所とディレクトリ構成を考えます。
 
-検証にクラウドは使いません。`local_file`はローカルにファイルを作るリソースです。手元ですぐ再現できます。
+検証にクラウドは使いません。`local_file`はローカルにファイルを作るリソースです。手元ですぐ再現できます。使ったコードは[soramikumo/terraform-state-basics](https://github.com/soramikumo/terraform-state-basics)にあります。
 
-検証環境（2026-10-23 実施）:
+検証環境（2026-10-23〜24 実施）:
 
 | 項目 | バージョン |
 |---|---|
 | 実行マシン | Mac（Apple Silicon） |
 | Terraform | 1.12.1 |
 | hashicorp/local | 2.5.3 |
-| hashicorp/random | 3.7.2 |
 
 ## 用語
+簡単にterraformで出てくる用語の解説です。よく使うものだけ抜粋にはなります。
 
 - provider：TerraformとクラウドのAPIをつなぐプラグイン。AWSなら`hashicorp/aws`、Google Cloudなら`hashicorp/google`。今回は`hashicorp/local`を使います
 - state：Terraformが作ったリソースの記録。既定では`terraform.tfstate`というJSONファイル
-- backend：stateの置き場所。既定はローカル。GCSやS3にも置けます
+- backend：stateの置き場所を指定することができます。既定はローカル。GCSやS3にも置けます
 - lineage：stateごとの固有のID。どのstateかを見分けるために使われます
 - serial：stateの版数。中身が変わるたびに増えます
 - ロック：同時に2つの操作がstateを書き換えないようにする仕組み
 - ドリフト：Terraformの外で実リソースが変わり、stateとずれた状態
 
-## 登場人物は3つ
+## どのように状態管理しているのか
 
-Terraformが見ているのは、コード・state・実リソースの3つだけです。providerはその間に立つ通訳です。
+Terraformが見ているのは、
+1. 手元にある宣言的コード
+2. state
+3. クラウド環境にある実リソース
+
+providerはその間に立つ通訳です。
+
+**「Terraformは3つを見比べて、差分だけを実行するツール」** でしかないのです。
+
 
 ![Terraformは3つを見比べる](/images/terraform-state-basics/01-cast.png)
-
-「Terraformは3つを見比べて、差分だけを実行するツール」です。
 
 ## init・plan・applyで何が起きるか
 
 ![init・plan・applyが読むもの・書くもの](/images/terraform-state-basics/02-commands.png)
 
-使ったコードはこれだけです。
+トグル planの挙動について
+planは何も出力しません。実リソースを読んで、変更内容を表示するだけです。
+すでにapplyしていれば、stateが生まれるので、唯一のstateと実リソースを比較しているのです。
+
+### stateは唯一である
+もし、すでにapplyして、リソースがクラウド上にできたとします。applyするとstateは生まれます。次にapply するときにはそのstateを元に、差分を検知するわけですが、ここでstateを破棄してplan・applyしようとするとどうなるでしょうか？
+
+答えは
+もう一度リソースを作り直します。
+正確に言えば、クラウドリソースで同じものを作りなすということはないのです。？
+→まあ正直に言えばわからなん
+
+
+使ったコードは[main.tf](https://github.com/soramikumo/terraform-state-basics/blob/main/main.tf)だけです。
 
 ```hcl:main.tf
+# プロバイダーの指定
 terraform {
   required_providers {
     local = {
@@ -69,6 +92,7 @@ terraform {
   }
 }
 
+# hello.txtを作成
 resource "local_file" "hello" {
   filename = "${path.module}/out/hello.txt"
   content  = "hello terraform\n"
@@ -97,6 +121,7 @@ main.tf
 
 :::message
 backendを書いた場合は、init後に`.terraform/terraform.tfstate`ができます。これはbackendの設定を覚えておくファイルで、stateではありません。
+backendには、一般的にはS3やGCSといったクラウドストレージにstateを投げるための設定を書くことが多いです。
 :::
 
 ### plan：3つを見比べる
@@ -165,20 +190,20 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 
 `resources`に「どのproviderで何を作ったか」が入っています。`serial`と`lineage`は次の章で使います。
 
-## stateは1つしかない
+## stateは1つしか存在してはいけない
 
-### stateがないと、Terraformは何も作っていないと判断する
-
-`terraform.tfstate`を別の場所に移してからplanしました。ファイル（`out/hello.txt`）は消していません。
+実験として`terraform.tfstate`を別の場所に移してからplanしました。
+**stateがないと、Terraformは何も作っていないと判断します**
 
 ```text:stateを移したあとのplan（実ログ・抜粋）
   # local_file.hello will be created
-  + resource "local_file" "hello" {
+  + resource "local_file" "hello" 
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 ```
-
-すでにあるファイルを、もう一度作ろうとしています。`local_file`は上書きするだけで済みますが、クラウドならこうはいきません。たとえば同じ名前のバケットは作成エラーになり、名前の重複が許されるリソースは二重にできます。
+あら、、、？
+すでにあるファイルを、もう一度作ろうとしています。`local_file`は上書きするだけで済みますが、クラウドならこうはいきません。
+**同じ名前のバケットは作成エラーになり、名前の重複が許されるリソースは二重にできてしまいます。**
 
 ### stateは記録であって実物ではない
 
@@ -191,7 +216,8 @@ local_file.hello: Refreshing state... [id=a0ea5669caa2a7da6e3aaf7a2fbb0bffd26896
 Plan: 1 to add, 0 to change, 0 to destroy.
 ```
 
-`Refreshing state...`で実リソースを読み、消えていることに気づいて作り直そうとしています。この状態をドリフトと呼びます。
+`Refreshing state...`で実リソースを読み、消えていることに気づいて作り直そうとしています。
+この状態をドリフトと呼びます。
 
 ![stateと実物がずれたときのplan](/images/terraform-state-basics/03-drift.png)
 
@@ -201,7 +227,8 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ### Terraformはstateの取り違えを拒否する
 
-stateにはlineage（どのstateか）とserial（何版目か）が入っています。古いstateや別のstateで上書きしようとすると、Terraformが止めます。
+stateには`lineage`（どのstateか）と`serial`（何版目か）が入っています。
+古いstateや別のstateで上書きしようとすると、Terraformが止めてくれます
 
 まずserialが1の時点でstateをコピーしました。次はファイルの中身を変えてapplyします。serialは1から4に増えました。1回のapplyで1ずつ増えるとは限りません。
 
@@ -219,15 +246,62 @@ $ terraform state push state-other.tfstate
 Failed to write state: cannot import state with lineage "00000000-0000-0000-0000-000000000000" over unrelated state with lineage "9220f245-dbe3-329f-517f-5f83e1eb51c0"
 ```
 
-Terraform自身が、正しいstateは常に1つという前提で動いています。
+Terraform自身が、正しいstateは常に1つという前提で動いています。その1つとは、backendに今置いてあるstateです。今回の[main.tf](https://github.com/soramikumo/terraform-state-basics/blob/main/main.tf)はbackendを書いていません。そのため既定のlocal backendになり、同じディレクトリの`terraform.tfstate`がその1つです。最後に書き込まれたstateが、そのまま正しいstateになります。
+
+lineageとserialで確かめているのは「同じstateの古くない版か」だけ。中身が正しいかは見ていません。
+
+試しに、同じlineageのままserialだけ1つ上げたstateを作りました。中身の`content`は`fake`に書き換えてあります。書き戻すと、エラーなく通ります。
+
+```text:中身を書き換えたstateを書き戻す（実ログ）
+$ terraform state push forged.tfstate
+$ terraform state pull | grep '"content"'
+            "content": "fake\n",
+```
+
+実物のファイルは`hello terraform`のままです。それでもplanは作り直しを提案しました。
+
+```text:書き換えたstateでのplan（実ログ・抜粋）
+  # local_file.hello must be replaced
+-/+ resource "local_file" "hello" {
+      ~ content              = <<-EOT # forces replacement
+          - fake
+          + hello terraform
+        EOT
+
+Plan: 1 to add, 0 to change, 1 to destroy.
+```
+
+同じ中身のコピーを配っても、次のapplyで古くなります。全員が読み書きするstateは1か所におかなければなりません。
 
 ## 1つしかないstateを守るのに要るもの
 
-要るのは共有・ロック・履歴・機密保護の4つです。共有と履歴は名前のとおりです。ここではロックと機密を実際に見ます。
+要るのは
+1. 共有
+2. ロック
+3. 履歴
+4. 機密保護
+
+以前にもいった通り、例外を除いてstateは基本クラウドストレージ(s3やgcs)に起きます。
+ここではロックと機密を実際に見ます。
 
 ### ロック：同時にapplyすると片方が止まる
 
 15秒かかるリソース（`local-exec`で`sleep 15`）を足しました。applyを2つ同時に走らせると、あとの方が止まります。
+
+:::details 実際に流したコマンド
+足したのは[add/slow.tf](https://github.com/soramikumo/terraform-state-basics/blob/main/add/slow.tf)です。1つ目のapplyは裏で走らせ、4秒後に2つ目を走らせました。
+
+```sh
+# 1つ目：裏で走らせる。sleep 15で15秒かかる
+terraform apply -auto-approve > apply-A.log 2>&1 &
+
+# 4秒後、1つ目がまだ動いている間に2つ目を実行
+sleep 4
+terraform apply -auto-approve
+```
+
+`-auto-approve`は確認の`yes`を飛ばすオプションです。裏で走らせたapplyには`yes`を打てないため付けました。ターミナルを2つ開き、1つ目が終わる前に2つ目を走らせても同じ結果になります。
+:::
 
 ```text:あとから走らせたapply（実ログ・抜粋）
 Error: Error acquiring the state lock
@@ -245,17 +319,39 @@ Lock Info:
 
 ### 機密：planでは隠れていてもstateには平文で入る
 
-`random_password`で16文字のパスワードを作りました。
+`sensitive = true`を付けた変数でパスワードを渡しました。値は`demo-pass-1234`です。
+
+```hcl:secret/main.tf
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+# 実際はDBのパスワード欄などに渡す
+resource "terraform_data" "db" {
+  input = var.db_password
+}
+```
 
 ```text:terraform apply（実ログ・抜粋）
-      + result      = (sensitive value)
+$ terraform apply -var 'db_password=demo-pass-1234'
+
+  + resource "terraform_data" "db" {
+      + id     = (known after apply)
+      + input  = (sensitive value)
+      + output = (known after apply)
+    }
 ```
 
 ```json:terraform.tfstate（実物・抜粋）
-"result": "（実際のパスワードが平文で入っている。記事では伏せた）",
+"input": {
+  "value": "demo-pass-1234",
+  "type": "string"
+},
 ```
 
 planの表示では隠れていますが、stateにはそのまま入ります。HashiCorp公式ドキュメントも、stateを機密情報として扱いGitのワークフローから外すよう勧めています。
+もし管理する場合は注意が必要になります。
 
 ## stateの置き場所を比べる
 
