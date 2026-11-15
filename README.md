@@ -34,6 +34,7 @@ npx zenn preview          # http://localhost:8000 でプレビュー
 | [21c2511bb9516b](articles/21c2511bb9516b.md) | SAAに合格したけど全然身になってなかった話 |
 | [9b6f00aad4d0ec](articles/9b6f00aad4d0ec.md) | 【リアーキテクチャ】Azure VMからVMSSに移行した話 |
 | [k8s-basics-kind](articles/k8s-basics-kind.md) | 今更Kubernetesへ入門する アーキテクチャと自己修復 |
+| [gke-network-history](articles/gke-network-history.md) | （下書き）初めてのGKEで迷ったネットワークを、歴史から読み解く |
 | [email-codex-guide](articles/email-codex-guide.md) | （下書き）メールはどう届く？送信ボタンから受信トレイに現れるまで |
 | [how-email-reaches-inbox](articles/how-email-reaches-inbox.md) | （下書き）メールを送信してから相手の受信トレイに届くまで |
 
